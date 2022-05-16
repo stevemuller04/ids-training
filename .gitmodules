@@ -1,0 +1,3 @@
+[submodule "docker-idsdemo/img/docker-alpine-ftp-server"]
+	path = docker-idsdemo/img/docker-alpine-ftp-server
+	url = https://github.com/delfer/docker-alpine-ftp-server

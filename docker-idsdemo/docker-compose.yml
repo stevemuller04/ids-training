@@ -1,0 +1,190 @@
+version: "3.9"
+
+services:
+  rproxy:
+    image: nginx:1.21-alpine
+    restart: always
+    volumes:
+      - ./cnf/rproxy/:/etc/nginx/conf.d:ro
+      - ./cnf/ssl/:/etc/nginx/ssl:ro
+    ports:
+      - 443:443
+    networks:
+      internal:
+        ipv4_address: 10.10.1.1
+        aliases: ['rproxy.local']
+      external:
+        ipv4_address: 172.16.32.11
+        aliases: ['www.sky.net']
+  ssh:
+    build: ./img/ssh
+    restart: always
+    ports:
+      - 22:22
+    networks:
+      internal:
+        ipv4_address: 10.10.1.2
+        aliases: ['ssh.local']
+      external:
+        ipv4_address: 172.16.32.12
+        aliases: ['ssh.sky.net']
+  cc:
+    build: ./img/cc
+    restart: always
+    ports:
+      - 12345:12345
+    networks:
+      internal:
+        ipv4_address: 10.10.1.3
+        aliases: ['cc.local']
+      external:
+        ipv4_address: 172.16.32.13
+        aliases: ['cc.sky.net']
+  site-www:
+    image: nginx:1.21-alpine
+    restart: always
+    volumes:
+      - ./cnf/site-www/:/etc/nginx/conf.d/:ro
+      - ./dat/site/:/www
+    networks:
+      internal:
+        ipv4_address: 10.10.2.1
+        aliases: ['site.local']
+  site-php:
+    image: php:7.4-fpm-alpine
+    restart: always
+    volumes:
+      - ./dat/site/:/www
+    networks:
+      internal:
+        ipv4_address: 10.10.2.2
+  api-www:
+    image: nginx:1.21-alpine
+    restart: always
+    ports:
+      - 8080:8080
+    volumes:
+      - ./cnf/api-www/:/etc/nginx/conf.d/:ro
+      - ./dat/api/:/www
+    networks:
+      internal:
+        ipv4_address: 10.10.3.1
+        aliases: ['api.local']
+      external:
+        ipv4_address: 172.16.32.31
+        aliases: ['api.sky.net']
+  api-php:
+    image: php:7.4-fpm-alpine
+    restart: always
+    volumes:
+      - ./dat/api/:/www
+    networks:
+      internal:
+        ipv4_address: 10.10.3.2
+  db:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: r00t
+    networks:
+      internal:
+        ipv4_address: 10.10.10.10
+  ftp:
+    build: ./img/docker-alpine-ftp-server
+    restart: always
+    ports:
+      - 21:21
+    environment:
+      USERS: "admin|admin lynx|lucid pangolin|precise unicorn|utopic gorilla|groovy tahr|trusty xerus|xenial beaver|bionic"
+    networks:
+      internal:
+        ipv4_address: 10.10.4.1
+        aliases: ['ftp.local']
+      external:
+        ipv4_address: 172.16.32.41
+        aliases: ['ftp.sky.net']
+  client-site:
+    deploy:
+      replicas: 5
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/site.sh:/init.sh:ro
+    networks:
+      - external
+  client-site-sqli:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/site-sqli.sh:/init.sh:ro
+    networks:
+      - external
+  client-site-attacks:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/site-attacks.sh:/init.sh:ro
+    networks:
+      - external
+  client-api:
+    deploy:
+      replicas: 5
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/api.sh:/init.sh:ro
+    networks:
+      - external
+  client-api-nonssl:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/api-nonssl.sh:/init.sh:ro
+    networks:
+      - external
+  client-ftp:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/ftp.sh:/init.sh:ro
+    networks:
+      - external
+  client-ftp-guess:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/ftp-guess.sh:/init.sh:ro
+    networks:
+      - external
+  client-cc:
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/cc.sh:/init.sh:ro
+    networks:
+      - external
+  client-ddos:
+    deploy:
+      replicas: 10
+    build: ./img/client
+    restart: always
+    volumes:
+      - ./cnf/client/ddos.sh:/init.sh:ro
+    networks:
+      - external
+
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: vnet_internal
+  external:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: vnet_external
