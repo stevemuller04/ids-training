@@ -250,21 +250,56 @@ By convention, `msg` should be the first keyword and `classtype`, `sid`, `rev` t
 Options are processed one after the other (order matters!).  
 → https://suricata.readthedocs.io/en/suricata-6.0.0/rules/index.html
 
-Explain content modifiers & sticky buffers with the help of examples (see https://suricata.readthedocs.io/en/suricata-6.0.0/rules/intro.html#modifier-keywords)
+These options behave on two different ways (depending on the keyword):
+→ https://suricata.readthedocs.io/en/suricata-6.0.0/rules/intro.html#modifier-keywords
+  * some keywords are *content modifiers*; they modify a content that has been previously selected by another keyword in the rule
+    for example: `nocase;` after a `content:"";` modifies the `content` keyword to make it case-insensitive
+  * some keywords are *sticky buffers*; they announce how a future keyword should behave
+    for example: `http.uri;` announces that the upcoming `content:"";` should match the HTTP URI
 
 Show how to detect these features by writing corresponding rules (joint exercise):
-  * unusual ports from unusual networks
-  * (IP reputation, geoip)
-  * general plaintext
-    - https://suricata.readthedocs.io/en/suricata-6.0.0/rules/payload-keywords.html
-  * plaintext in module variables (e.g. [http](https://suricata.readthedocs.io/en/suricata-6.0.0/rules/http-keywords.html), dns)
-  * threshold (→ DDoS)
-    - https://medium.com/@mshulkhan/detection-attack-using-suricata-1-5ea7b2f62551
+  * __unusual ports from unusual networks__  
+    → https://docs.suricata.io/en/suricata-6.0.5/rules/intro.html#source-and-destination  
+    for example, no services except rproxy, ftp and ssh should be exposed on Internet (`172.16.x.x`)  
+    Corresponding rule:  
+    `alert ip any any -> [172.16.0.0/16, !172.16.32.11, !172.16.32.41, !172.16.32.12] any (msg:"Direct access to internal network"; classtype:intrusion; sid:1; rev:1;)`
+  * __general plaintext__  
+    → https://suricata.readthedocs.io/en/suricata-6.0.0/rules/payload-keywords.html  
+    - `content:"";` to search for text (use `|AF|` to search for byte 0xAF)
+      * need to escape `"` = `|22|`, `;` = `|3B|`, `:` = `|3A|`, `|` = `|7C|`
+      * can use negation: `content:!"";`
+    - can use another `content:"";` after `content:"";` to search within the previous content
+  * __content search options__  
+    → https://suricata.readthedocs.io/en/suricata-6.0.0/rules/payload-keywords.html  
+    - `nocase;` modifies content search to be case-insensitive
+    - `depth:N;` modifies content to search for first `N` bytes from the start (given by `offset`)
+    - `offset:N;` modifies content to start searching at the `N`-th byte from the start
+    - `distance:N;` modifies content to search at offset `N` _after_ end of previous `content` (like `offset`)
+    - `within:N;` modifies content to search within `N` bytes _after_ end of previous `content` (like `depth`)
+    - `startswith`, `endswith`
+  * __keywords specific to protocols__  
+    → e.g. [http](https://suricata.readthedocs.io/en/suricata-6.0.0/rules/http-keywords.html), [dns](https://docs.suricata.io/en/suricata-6.0.0/rules/dns-keywords.html), ...  
+    protocol keywords:
+    - `http.uri`, `http.request_body`, `http.user_agent`, `http.host`, ... and many more
+    - `filename:"";`, `fileext:"";`, `filesize:>100MB` and more (file extraction module)
+    - `dns.query`
+    for example, detect `.exe` downloads:  
+    `alert http any any -> any any (msg:"Exe download"; http.uri; content:".exe"; endswith; classtype:malware; sid:1; rev:1;)`  
+    `alert http any any -> any any (msg:"Exe download"; fileext:"exe"; classtype:malware; sid:1; rev:1;)`
+  * __threshold__ (→ DDoS)  
+    → https://docs.suricata.io/en/suricata-6.0.0/rules/thresholding.html  
+    → https://medium.com/@mshulkhan/detection-attack-using-suricata-1-5ea7b2f62551  
+    control alerts using:
+    - `threshold: type threshold, track <by_src|by_dst|by_both>, count N, seconds T;` to set a minimum threshold (`N` triggers within `T`seconds) after which an alert is raised
+    - `threshold: type limit, track <by_src|by_dst|by_both>, count N, seconds T;` to make the rule alert at most `N` times within `T`seconds
+  * __GeoIP, IP reputation__  
+    → https://docs.suricata.io/en/suricata-6.0.0/rules/header-keywords.html#geoip
+    → https://docs.suricata.io/en/suricata-6.0.0/rules/ip-reputation-rules.html
 
 Reload rules using
 ```bash
 suricatasc -c reload-rules
-# or
+# if the above fails (see below), use the following, slower command
 systemctl restart suricata
 ```
 
@@ -300,7 +335,7 @@ For help, do one of the exercices in class.
 
 > Up until now, alerts are logged in a local log file. How can they be visualized?
 
-- log format is JSON-based → use `jq`
+- log format is JSON-based → use `tail -f | jq`
 - use with GUI: Kibana
 
 ## Further topics
