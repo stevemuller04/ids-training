@@ -310,6 +310,8 @@ unix-command:
   filename: /var/run/suricata/suricata-command.socket
 ```
 
+Suricata logs to a file at `/var/log/suricata/fast.log` by default.
+
 Examples:
 
 ```
